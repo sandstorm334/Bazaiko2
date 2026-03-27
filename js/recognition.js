@@ -54,6 +54,40 @@ function emitModelStatus(state, message) {
   }));
 }
 
+function hasValidModelSessions() {
+  return Boolean(
+    modelsLoaded
+    && yoloSession
+    && ocrModel && ocrModel.initialized && ocrModel.session
+    && equipmentClassifier && equipmentClassifier.ready && equipmentClassifier.session
+    && equipmentTypeClassifier && equipmentTypeClassifier.initialized && equipmentTypeClassifier.session
+  );
+}
+
+function resetModelSessions() {
+  yoloSession = null;
+  ocrModel = null;
+  equipmentClassifier = null;
+  equipmentTypeClassifier = null;
+  modelsLoaded = false;
+  modelsLoading = false;
+  modelsLoadPromise = null;
+  preloadStarted = false;
+}
+
+async function ensureModelSessionsReady(options = {}) {
+  if (hasValidModelSessions()) {
+    return true;
+  }
+  if (modelsLoading && modelsLoadPromise) {
+    await modelsLoadPromise;
+    return hasValidModelSessions();
+  }
+  resetModelSessions();
+  await loadModels(options);
+  return hasValidModelSessions();
+}
+
 async function loadModels(options = {}) {
   if (modelsLoaded) {
     return;
@@ -596,9 +630,9 @@ async function recognizeImagesInParallel(files, progressCallback) {
     return { items: [], metrics: { totalMs: 0, detectMs: 0, classifyMs: 0, ocrMs: 0 } };
   }
 
-  if (!modelsLoaded) {
+  if (!hasValidModelSessions()) {
     progressCallback(0, 'モデルを読み込み中...');
-    await loadModels();
+    await ensureModelSessionsReady();
   }
 
   const started = performance.now();

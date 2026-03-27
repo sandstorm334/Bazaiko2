@@ -13,6 +13,7 @@ let correctionDirectoryHandle = null;
 let latestRecognitionMetrics = null;
 let modelReady = false;
 let recognitionRunning = false;
+let resumeRecoveryRunning = false;
 
 const qs = (sel) => document.querySelector(sel);
 const qsa = (sel) => document.querySelectorAll(sel);
@@ -157,6 +158,75 @@ function setupEventListeners() {
 
   document.addEventListener('keydown', handleKeydown);
   document.addEventListener('model-status', handleModelStatus);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('pageshow', handlePageShow);
+  window.addEventListener('focus', handleWindowFocus);
+}
+
+async function recoverAfterPageResume(reason) {
+  if (isFileProtocol() || resumeRecoveryRunning) {
+    return;
+  }
+  resumeRecoveryRunning = true;
+  try {
+    const statusEl = qs('#status');
+    const modelStatusEl = qs('#model-status');
+    if (!recognitionRunning && statusEl) {
+      statusEl.textContent = 'ページ復帰を確認、状態を再同期中...';
+    }
+    if (modelStatusEl) {
+      modelStatusEl.textContent = `モデル状態を再確認中 (${reason})`;
+    }
+    const ready = await ensureModelSessionsReady();
+    if (!ready) {
+      throw new Error('モデルセッションの復旧に失敗しました');
+    }
+    // UI freeze recovery: refresh stateful views on return.
+    appState.counts = loadCounts();
+    appState.targetPeople = loadTargetPeople();
+    refreshInventoryViews();
+    renderRecognitionTable();
+    if (activeIndex >= 0) {
+      await selectRow(activeIndex);
+    }
+    if (!recognitionRunning && statusEl) {
+      statusEl.textContent = '準備完了';
+    }
+    if (modelStatusEl) {
+      modelStatusEl.textContent = 'モデル準備完了 (復帰後再同期)';
+    }
+    recognitionRunning = false;
+  } catch (error) {
+    console.error('Resume recovery failed:', error);
+    const statusEl = qs('#status');
+    const modelStatusEl = qs('#model-status');
+    if (statusEl) {
+      statusEl.textContent = '復帰処理失敗';
+    }
+    if (modelStatusEl) {
+      modelStatusEl.textContent = `復帰処理エラー: ${error.message}`;
+    }
+  } finally {
+    resumeRecoveryRunning = false;
+  }
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    void recoverAfterPageResume('visibilitychange');
+  }
+}
+
+function handlePageShow(event) {
+  if (event.persisted) {
+    void recoverAfterPageResume('pageshow-bfcache');
+  }
+}
+
+function handleWindowFocus() {
+  if (document.visibilityState === 'visible') {
+    void recoverAfterPageResume('focus');
+  }
 }
 
 function handleModelStatus(event) {
