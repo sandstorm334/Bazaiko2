@@ -12,11 +12,6 @@
     <div class="controls">
       <button id="open-target-modal" type="button" class="btn outline">目標人数設定</button>
       <button id="theme-toggle" type="button" class="btn outline">テーマ: ライト</button>
-      <button id="export-csv" type="button" class="btn primary">CSV書き出し</button>
-      <label class="file-btn btn outline">
-        CSV読み込み
-        <input id="import-csv" type="file" accept=".csv">
-      </label>
     </div>
   </header>
 
@@ -88,7 +83,6 @@
             <button id="clear-selection" type="button" class="btn outline">選択を全解除</button>
             <button id="open-corrections" type="button" class="btn outline">訂正ダイアログ</button>
             <button id="pick-correction-dir" type="button" class="btn outline">補正保存先</button>
-            <button id="export-corrections" type="button" class="btn outline">補正バックアップ</button>
             <label class="toggle-label">
               <input type="checkbox" id="learning-mode-toggle">
               <span>学習モード</span>
@@ -104,12 +98,11 @@
           <div class="row sub-status-row">
             <div id="recognition-metrics" class="status meta"></div>
             <div id="model-status" class="status meta">モデルをバックグラウンドで読み込み中</div>
-            <div id="correction-dir-status" class="status meta">保存先未設定</div>
           </div>
         </div>
 
         <div class="recognition-layout">
-          <div class="stack">
+          <div class="stack recognition-sidebar">
             <div class="card">
               <h3>選択ファイル</h3>
               <ul id="file-list"></ul>
@@ -120,7 +113,7 @@
             </div>
           </div>
 
-          <div class="stack">
+          <div class="stack recognition-results">
             <div class="card">
               <h3>認識結果</h3>
               <div class="table-wrap recognition-table">
@@ -140,7 +133,7 @@
             </div>
           </div>
 
-          <div class="stack">
+          <div class="stack recognition-preview">
             <div class="card">
               <h3>プレビュー</h3>
               <div class="preview-grid">

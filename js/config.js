@@ -55,7 +55,6 @@ const CONFIG = {
     equipment: 0.7,
     tier: 0.7,
   },
-  correctionExportName: 'ba_corrections_export.json',
 };
 
 function loadUserConfig() {

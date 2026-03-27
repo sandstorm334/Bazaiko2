@@ -101,8 +101,6 @@ function setupEventListeners() {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
   });
   qs('#theme-toggle').addEventListener('click', toggleTheme);
-  qs('#export-csv').addEventListener('click', () => exportToCsv(appState.counts));
-  qs('#import-csv').addEventListener('change', handleCsvImport);
   qs('#recognition-files').addEventListener('change', handleFilesSelected);
   qs('#run-recognition').addEventListener('click', runRecognition);
   qs('#clear-selection').addEventListener('click', clearSelections);
@@ -110,7 +108,6 @@ function setupEventListeners() {
     await openCorrectionModal();
   });
   qs('#pick-correction-dir').addEventListener('click', pickCorrectionDirectory);
-  qs('#export-corrections').addEventListener('click', exportCorrectionsBackup);
 
   const learningToggle = qs('#learning-mode-toggle');
   learningToggle.checked = CONFIG.learningMode;
@@ -362,22 +359,6 @@ function renderRecommendations() {
   }).join('');
 }
 
-async function handleCsvImport(event) {
-  const file = event.target.files[0];
-  if (!file) {
-    return;
-  }
-  try {
-    appState.counts = await importFromCsv(file);
-    saveCounts(appState.counts);
-    refreshInventoryViews();
-  } catch (_err) {
-    alert('CSV読み込みに失敗しました。');
-  } finally {
-    event.target.value = '';
-  }
-}
-
 function handleFilesSelected(event) {
   const files = Array.from(event.target.files || []);
   qs('#file-list').innerHTML = files.map((file) => `<li>${file.name}</li>`).join('');
@@ -583,9 +564,7 @@ async function applyCorrections() {
   if (activeRowIndex >= 0) {
     await selectRow(activeRowIndex);
   }
-
   if (exportEntries.length > 0) {
-    appendCorrectionExport(exportEntries);
     await persistCorrectionsToDirectory(exportEntries);
   }
   switchTab(activeTabId);
@@ -604,20 +583,21 @@ async function buildCorrectionExportEntry(item) {
 
 async function pickCorrectionDirectory() {
   if (!window.showDirectoryPicker) {
-    alert('このブラウザはディレクトリ保存 API に未対応です。エクスポート機能を使用してください。');
+    alert('このブラウザはディレクトリ保存 API に未対応です。');
     return;
   }
   try {
     correctionDirectoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    qs('#correction-dir-status').textContent = `保存先: ${correctionDirectoryHandle.name}`;
-  } catch (_err) {
-    qs('#correction-dir-status').textContent = '保存先未設定';
+    alert(`保存先を設定しました: ${correctionDirectoryHandle.name}`);
+  } catch (error) {
+    if (error && error.name !== 'AbortError') {
+      alert(`保存先設定に失敗しました: ${error.message}`);
+    }
   }
 }
 
 async function persistCorrectionsToDirectory(entries) {
-  if (!correctionDirectoryHandle) {
-    qs('#correction-dir-status').textContent = '保存先未設定: ローカルバックアップのみ更新';
+  if (!correctionDirectoryHandle || entries.length === 0) {
     return;
   }
   try {
@@ -635,16 +615,10 @@ async function persistCorrectionsToDirectory(entries) {
       await textWriter.write(String(entry.count));
       await textWriter.close();
     }
-    qs('#correction-dir-status').textContent = `保存完了: ${entries.length}件`;
   } catch (error) {
     console.error(error);
-    qs('#correction-dir-status').textContent = `保存失敗: ${error.message}`;
+    alert(`補正データの保存に失敗しました: ${error.message}`);
   }
-}
-
-function exportCorrectionsBackup() {
-  const rows = loadCorrectionExports();
-  downloadJsonFile(CONFIG.correctionExportName, rows);
 }
 
 function handleKeydown(event) {

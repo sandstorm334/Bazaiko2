@@ -12,7 +12,7 @@ const MODEL_CONFIG = {
   yolo: {
     path: 'models/yolo_frame.onnx',
     inputSize: 640,
-    confThreshold: 0.7,
+    confThreshold: 0.82,
   },
   equipmentType: {
     path: 'models/equipment_type_classifier.onnx',
@@ -249,9 +249,22 @@ function postprocessYolo(output, originalWidth, originalHeight, ratio, padX, pad
     const bottom = Math.max(0, Math.min(originalHeight, y2));
     const width = right - left;
     const height = bottom - top;
-    if (width >= 4 && height >= 4) {
-      boxes.push({ x: left, y: top, width, height, confidence: conf });
+    if (width < 14 || height < 14) {
+      continue;
     }
+    const touchesLeft = left <= 1;
+    const touchesTop = top <= 1;
+    const touchesRight = right >= originalWidth - 1;
+    const touchesBottom = bottom >= originalHeight - 1;
+    const edgeTouches = Number(touchesLeft) + Number(touchesTop) + Number(touchesRight) + Number(touchesBottom);
+    if (edgeTouches >= 2) {
+      continue;
+    }
+    const aspect = width / Math.max(1, height);
+    if (aspect < 0.55 || aspect > 1.75) {
+      continue;
+    }
+    boxes.push({ x: left, y: top, width, height, confidence: conf });
   }
   return nms(boxes, 0.5).sort((a, b) => {
     const rowA = Math.floor(a.y / 100);
