@@ -17,6 +17,15 @@ let recognitionRunning = false;
 const qs = (sel) => document.querySelector(sel);
 const qsa = (sel) => document.querySelectorAll(sel);
 const isFileProtocol = () => window.location.protocol === 'file:';
+const bindIfPresent = (selector, eventName, handler) => {
+  const element = qs(selector);
+  if (!element) {
+    console.warn(`Missing element: ${selector}`);
+    return null;
+  }
+  element.addEventListener(eventName, handler);
+  return element;
+};
 
 function canvasToBlob(canvas) {
   return new Promise((resolve, reject) => {
@@ -87,12 +96,22 @@ async function init() {
   applyTheme(appState.theme);
   setupEventListeners();
   refreshInventoryViews();
+  const statusEl = qs('#status');
+  const modelStatusEl = qs('#model-status');
   if (isFileProtocol()) {
-    qs('#status').textContent = 'file:// では認識機能は動作しません';
-    qs('#model-status').textContent = 'start-webapp.bat または start-webapp.ps1 で起動してください';
+    if (statusEl) {
+      statusEl.textContent = 'file:// では認識機能は動作しません';
+    }
+    if (modelStatusEl) {
+      modelStatusEl.textContent = 'start-webapp.bat または start-webapp.ps1 で起動してください';
+    }
   } else {
-    qs('#status').textContent = 'モデル読込待機中';
-    qs('#model-status').textContent = 'モデルをバックグラウンドで読み込み中';
+    if (statusEl) {
+      statusEl.textContent = 'モデル読込待機中';
+    }
+    if (modelStatusEl) {
+      modelStatusEl.textContent = 'モデルをバックグラウンドで読み込み中';
+    }
   }
 }
 
@@ -100,35 +119,37 @@ function setupEventListeners() {
   qsa('.tab').forEach((tab) => {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
   });
-  qs('#theme-toggle').addEventListener('click', toggleTheme);
-  qs('#recognition-files').addEventListener('change', handleFilesSelected);
-  qs('#run-recognition').addEventListener('click', runRecognition);
-  qs('#clear-selection').addEventListener('click', clearSelections);
-  qs('#open-corrections').addEventListener('click', async () => {
+  bindIfPresent('#theme-toggle', 'click', toggleTheme);
+  bindIfPresent('#recognition-files', 'change', handleFilesSelected);
+  bindIfPresent('#run-recognition', 'click', runRecognition);
+  bindIfPresent('#clear-selection', 'click', clearSelections);
+  bindIfPresent('#open-corrections', 'click', async () => {
     await openCorrectionModal();
   });
-  qs('#pick-correction-dir').addEventListener('click', pickCorrectionDirectory);
+  bindIfPresent('#pick-correction-dir', 'click', pickCorrectionDirectory);
 
   const learningToggle = qs('#learning-mode-toggle');
-  learningToggle.checked = CONFIG.learningMode;
-  learningToggle.addEventListener('change', (event) => {
-    CONFIG.learningMode = event.target.checked;
-    saveUserConfig();
-  });
+  if (learningToggle) {
+    learningToggle.checked = CONFIG.learningMode;
+    learningToggle.addEventListener('change', (event) => {
+      CONFIG.learningMode = event.target.checked;
+      saveUserConfig();
+    });
+  }
 
-  qs('#close-corrections').addEventListener('click', closeCorrectionModal);
-  qs('#apply-corrections').addEventListener('click', applyCorrections);
-  qs('#correction-modal').addEventListener('click', (event) => {
+  bindIfPresent('#close-corrections', 'click', closeCorrectionModal);
+  bindIfPresent('#apply-corrections', 'click', applyCorrections);
+  bindIfPresent('#correction-modal', 'click', (event) => {
     if (event.target.id === 'correction-modal') {
       closeCorrectionModal();
     }
   });
 
-  qs('#open-target-modal').addEventListener('click', openTargetModal);
-  qs('#close-target-modal').addEventListener('click', closeTargetModal);
-  qs('#save-targets').addEventListener('click', saveTargets);
-  qs('#reset-targets').addEventListener('click', resetTargets);
-  qs('#target-modal').addEventListener('click', (event) => {
+  bindIfPresent('#open-target-modal', 'click', openTargetModal);
+  bindIfPresent('#close-target-modal', 'click', closeTargetModal);
+  bindIfPresent('#save-targets', 'click', saveTargets);
+  bindIfPresent('#reset-targets', 'click', resetTargets);
+  bindIfPresent('#target-modal', 'click', (event) => {
     if (event.target.id === 'target-modal') {
       closeTargetModal();
     }
@@ -142,9 +163,13 @@ function handleModelStatus(event) {
   const detail = event.detail || {};
   const message = detail.message || '';
   modelReady = detail.state === 'ready';
-  qs('#model-status').textContent = message || 'モデル状態不明';
-  if (!recognitionRunning) {
-    qs('#status').textContent = modelReady ? '準備完了' : (message || 'モデル読み込み中');
+  const modelStatusEl = qs('#model-status');
+  const statusEl = qs('#status');
+  if (modelStatusEl) {
+    modelStatusEl.textContent = message || 'モデル状態不明';
+  }
+  if (!recognitionRunning && statusEl) {
+    statusEl.textContent = modelReady ? '準備完了' : (message || 'モデル読み込み中');
   }
 }
 
@@ -670,4 +695,16 @@ function resetTargets() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init().catch((error) => {
+    console.error('Initialization failed:', error);
+    const statusEl = qs('#status');
+    const modelStatusEl = qs('#model-status');
+    if (statusEl) {
+      statusEl.textContent = '初期化失敗';
+    }
+    if (modelStatusEl) {
+      modelStatusEl.textContent = `初期化エラー: ${error.message}`;
+    }
+  });
+});
