@@ -54,12 +54,20 @@ function emitModelStatus(state, message) {
   }));
 }
 
+function isSafariBrowser() {
+  const ua = navigator.userAgent || '';
+  return /Safari/i.test(ua) && !/Chrome|CriOS|Edg|OPR|FxiOS/i.test(ua);
+}
+
+function supportsCrossOriginIsolation() {
+  return typeof window.crossOriginIsolated === 'boolean' ? window.crossOriginIsolated : false;
+}
+
 function hasValidModelSessions() {
   return Boolean(
     modelsLoaded
     && yoloSession
     && ocrModel && ocrModel.initialized && ocrModel.session
-    && equipmentClassifier && equipmentClassifier.ready && equipmentClassifier.session
     && equipmentTypeClassifier && equipmentTypeClassifier.initialized && equipmentTypeClassifier.session
   );
 }
@@ -73,6 +81,19 @@ function resetModelSessions() {
   modelsLoading = false;
   modelsLoadPromise = null;
   preloadStarted = false;
+}
+
+async function ensureEquipmentClassifierReady(executionProviders = getExecutionProviders()) {
+  if (equipmentClassifier && equipmentClassifier.ready && equipmentClassifier.session) {
+    return true;
+  }
+  emitModelStatus('loading', '補助数値モデルを読み込み中...');
+  equipmentClassifier = new EquipmentClassifier(
+    MODEL_CONFIG.classifier.path,
+    MODEL_CONFIG.classifier.configPath,
+  );
+  await equipmentClassifier.initialize(executionProviders);
+  return true;
 }
 
 async function ensureModelSessionsReady(options = {}) {
@@ -110,8 +131,14 @@ async function loadModels(options = {}) {
     useWebGPU = await checkWebGPUSupport();
     const executionProviders = getExecutionProviders();
     ort.env.wasm.simd = true;
+    const isolated = supportsCrossOriginIsolation();
+    const safari = isSafariBrowser();
     const cores = navigator.hardwareConcurrency || 4;
-    ort.env.wasm.numThreads = cores <= 4 ? 1 : Math.max(2, Math.min(4, Math.floor(cores / 2)));
+    if (!isolated || safari) {
+      ort.env.wasm.numThreads = 1;
+    } else {
+      ort.env.wasm.numThreads = cores <= 4 ? 1 : Math.max(2, Math.min(4, Math.floor(cores / 2)));
+    }
 
     updateStatus('loading', 'フレーム検出モデルを読み込み中...');
     yoloSession = await ort.InferenceSession.create(MODEL_CONFIG.yolo.path, {
@@ -123,14 +150,6 @@ async function loadModels(options = {}) {
     updateStatus('loading', '数値OCRモデルを読み込み中...');
     ocrModel = new CRNNOCRInference(MODEL_CONFIG.ocr.path, MODEL_CONFIG.ocr.metadataPath);
     await ocrModel.init(executionProviders);
-    await yieldToMain();
-
-    updateStatus('loading', '補助数値モデルを読み込み中...');
-    equipmentClassifier = new EquipmentClassifier(
-      MODEL_CONFIG.classifier.path,
-      MODEL_CONFIG.classifier.configPath,
-    );
-    await equipmentClassifier.initialize(executionProviders);
     await yieldToMain();
 
     updateStatus('loading', '装備識別モデルを読み込み中...');
@@ -526,6 +545,7 @@ async function recognizeImage(file, progressCallback) {
   const typeResults = [];
   const cores = navigator.hardwareConcurrency || 4;
   const batchSize = useWebGPU ? 16 : (cores <= 4 ? 4 : 8);
+  const executionProviders = getExecutionProviders();
   const classifyStart = performance.now();
   for (let start = 0; start < cropCanvases.length; start += batchSize) {
     const batch = cropCanvases.slice(start, start + batchSize);
@@ -564,6 +584,7 @@ async function recognizeImage(file, progressCallback) {
       },
     }];
     if (shouldRunCountHead(allPairs[0].result, 0.99)) {
+      await ensureEquipmentClassifierReady(executionProviders);
       const headStart = performance.now();
       const headDecoded = equipmentClassifier.decodePrediction(await equipmentClassifier.predict(cropCanvas));
       metrics.ocrMs += (performance.now() - headStart);
