@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ブルーアーカイブ 装備マネージャー</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">ブルーアーカイブ 装備マネージャー</div>
+    <div class="controls">
+      <button id="open-target-modal" type="button" class="btn outline">目標人数設定</button>
+      <button id="theme-toggle" type="button" class="btn outline">テーマ: ライト</button>
+      <button id="export-csv" type="button" class="btn primary">CSV書き出し</button>
+      <label class="file-btn btn outline">
+        CSV読み込み
+        <input id="import-csv" type="file" accept=".csv">
+      </label>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button type="button" class="tab active" data-tab="inventory">在庫</button>
+    <button type="button" class="tab" data-tab="recognition">認識</button>
+  </nav>
+
+  <main>
+    <section id="inventory" class="tab-panel active">
+      <div class="panel-scroll">
+        <div class="inventory-layout">
+          <div class="card table-card inventory-main">
+            <div id="table-wrap" class="table-wrap"></div>
+          </div>
+          <div class="card detail-card inventory-detail">
+            <div class="summary-grid right-summary">
+              <div class="stat-card">
+                <div class="stat-label">達成率</div>
+                <div id="summary-completion" class="stat-value">0%</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">不足総数</div>
+                <div id="summary-missing" class="stat-value">0</div>
+              </div>
+            </div>
+            <h3>選択中の詳細</h3>
+            <pre id="detail">セルをクリックで詳細表示</pre>
+          </div>
+          <div class="inventory-bottom">
+            <div class="card rank">
+              <div class="card-head">
+                <h3>不足トップ(数)</h3>
+              </div>
+              <div id="shortage-count" class="rank-list"></div>
+            </div>
+            <div class="card rank">
+              <div class="card-head">
+                <h3>不足トップ(比率)</h3>
+              </div>
+              <div id="shortage-ratio" class="rank-list"></div>
+            </div>
+            <div class="card rank">
+              <div class="card-head">
+                <h3>何人分集まったか</h3>
+              </div>
+              <div id="people-progress" class="rank-list"></div>
+            </div>
+            <div class="card rank recommend-section">
+              <div class="card-head">
+                <h3>周回おすすめ</h3>
+              </div>
+              <div id="recommend-list" class="recommend-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="recognition" class="tab-panel">
+      <div class="panel-scroll">
+        <div class="card hero">
+          <div class="row">
+            <label class="file-btn">
+              スクリーンショット選択
+              <input id="recognition-files" type="file" accept=".png,.jpg,.jpeg" multiple>
+            </label>
+            <button id="run-recognition" type="button" class="btn primary">認識開始</button>
+            <button id="clear-selection" type="button" class="btn outline">選択を全解除</button>
+            <button id="open-corrections" type="button" class="btn outline">訂正ダイアログ</button>
+            <button id="pick-correction-dir" type="button" class="btn outline">補正保存先</button>
+            <button id="export-corrections" type="button" class="btn outline">補正バックアップ</button>
+            <label class="toggle-label">
+              <input type="checkbox" id="learning-mode-toggle">
+              <span>学習モード</span>
+            </label>
+          </div>
+          <div class="row">
+            <div id="status" class="status">準備中...</div>
+            <div class="progress">
+              <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <div id="progress-meta" class="status meta">0.0%</div>
+          </div>
+          <div class="row sub-status-row">
+            <div id="recognition-metrics" class="status meta"></div>
+            <div id="model-status" class="status meta">モデルをバックグラウンドで読み込み中</div>
+            <div id="correction-dir-status" class="status meta">保存先未設定</div>
+          </div>
+        </div>
+
+        <div class="recognition-layout">
+          <div class="stack">
+            <div class="card">
+              <h3>選択ファイル</h3>
+              <ul id="file-list"></ul>
+            </div>
+            <div class="card">
+              <h3>訂正候補</h3>
+              <div id="correction-list"></div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="card">
+              <h3>認識結果</h3>
+              <div class="table-wrap recognition-table">
+                <table class="table" id="recognition-table">
+                  <thead>
+                    <tr>
+                      <th>選択</th>
+                      <th>装備</th>
+                      <th>Tier</th>
+                      <th>所持数</th>
+                      <th>状態</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recognition-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="card">
+              <h3>プレビュー</h3>
+              <div class="preview-grid">
+                <div class="preview-box">
+                  <span class="preview-label">装備枠</span>
+                  <img id="preview-crop" alt="crop">
+                </div>
+                <div class="preview-box">
+                  <span class="preview-label">所持数</span>
+                  <img id="preview-count" alt="count">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 訂正ダイアログ -->
+  <div id="correction-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>訂正ダイアログ</h3>
+        <button id="close-corrections" type="button" class="btn outline">閉じる</button>
+      </div>
+      <div class="modal-body">
+        <p class="muted">認識結果を確認・訂正してください。</p>
+        <div id="correction-modal-list" class="correction-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="apply-corrections" type="button" class="btn primary">訂正を反映</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 目標人数設定モーダル -->
+  <div id="target-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>目標人数設定</h3>
+        <button id="close-target-modal" type="button" class="btn outline">閉じる</button>
+      </div>
+      <div class="modal-body">
+        <p class="muted">各装備の目標人数を設定します。</p>
+        <div id="target-people-list" class="target-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="reset-targets" type="button" class="btn outline">既定値に戻す</button>
+        <button id="save-targets" type="button" class="btn primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- モデル読み込み中表示 -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <p id="loading-text">モデルを読み込み中...</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/ort.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/logic.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/crnn-ocr.js"></script>
+  <script src="js/equipment-classifier.js"></script>
+  <script src="js/equipment-type-classifier.js"></script>
+  <script src="js/recognition.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

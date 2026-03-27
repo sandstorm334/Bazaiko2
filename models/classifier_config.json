@@ -1,0 +1,22 @@
+{
+  "model_name": "tier_count_classifier",
+  "input_shape": {
+    "batch": 1,
+    "channels": 3,
+    "height": 128,
+    "width": 128
+  },
+  "outputs": {
+    "tier_logits": 11,
+    "length_logits": 5,
+    "count_logits": [
+      5,
+      10
+    ]
+  },
+  "tier_classes": 11,
+  "max_count_digits": 5,
+  "digit_classes": 10,
+  "input_size": 128,
+  "input_channels": 3
+}

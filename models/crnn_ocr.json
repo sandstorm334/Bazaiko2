@@ -1,0 +1,22 @@
+{
+  "input_shape": [
+    1,
+    1,
+    32,
+    128
+  ],
+  "output_shape": [
+    1,
+    32,
+    11
+  ],
+  "input_name": "input",
+  "output_name": "output",
+  "opset_version": 14,
+  "preprocessor": "app/recognition/count_crnn_ctc.py::prepare_crnn_input",
+  "postprocessor": "app/recognition/count_crnn_ctc.py::decode_ctc_output",
+  "input_width": 128,
+  "input_height": 32,
+  "num_classes": 11,
+  "lstm_hidden": 128
+}
