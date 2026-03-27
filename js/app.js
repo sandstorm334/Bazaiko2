@@ -16,6 +16,7 @@ let recognitionRunning = false;
 
 const qs = (sel) => document.querySelector(sel);
 const qsa = (sel) => document.querySelectorAll(sel);
+const isFileProtocol = () => window.location.protocol === 'file:';
 
 function canvasToBlob(canvas) {
   return new Promise((resolve, reject) => {
@@ -86,8 +87,13 @@ async function init() {
   applyTheme(appState.theme);
   setupEventListeners();
   refreshInventoryViews();
-  qs('#status').textContent = 'モデル読込待機中';
-  qs('#model-status').textContent = 'モデルをバックグラウンドで読み込み中';
+  if (isFileProtocol()) {
+    qs('#status').textContent = 'file:// では認識機能は動作しません';
+    qs('#model-status').textContent = 'start-webapp.bat または start-webapp.ps1 で起動してください';
+  } else {
+    qs('#status').textContent = 'モデル読込待機中';
+    qs('#model-status').textContent = 'モデルをバックグラウンドで読み込み中';
+  }
 }
 
 function setupEventListeners() {
@@ -379,6 +385,10 @@ function handleFilesSelected(event) {
 }
 
 async function runRecognition() {
+  if (isFileProtocol()) {
+    alert('このページは file:// で開かれています。start-webapp.bat または start-webapp.ps1 で起動してください。');
+    return;
+  }
   const files = Array.from(qs('#recognition-files').files || []);
   if (!files.length) {
     alert('スクリーンショットを選択してください。');
@@ -401,6 +411,9 @@ async function runRecognition() {
     });
     recognitionItems = result.items;
     latestRecognitionMetrics = result.metrics;
+    appState.counts = result.aggregatedCounts || {};
+    saveCounts(appState.counts);
+    refreshInventoryViews();
     renderRecognitionTable();
     qs('#recognition-metrics').textContent = formatRecognitionMetrics(result.metrics);
     if (recognitionItems.some((item) => item.status === 'needs_correction')) {
